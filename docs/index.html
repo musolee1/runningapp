@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>5K Seaside Gamified Run — Demo</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#ff6b35;--muted:#93a0b3;color-scheme:dark}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;color:#e6eef6;background:linear-gradient(180deg,#071428 0%, #0b1522 100%);}
+    .wrap{max-width:980px;margin:28px auto;padding:18px;}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    p.lead{color:var(--muted);margin:6px 0 0;font-size:13px}
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));border:1px solid rgba(255,255,255,0.03);padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,0.6);}
+
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    button{background:var(--accent);border:none;color:#051118;padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted)}
+
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+    .stat{background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;text-align:center}
+    .stat b{display:block;font-size:18px}
+    .progress-wrap{margin:14px 0}
+
+    .progress{height:28px;background:rgba(255,255,255,0.04);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.03)}
+    .progress > i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#ffb679);transition:width 400ms ease}
+    .checkpoints{display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--muted)}
+
+    .avatar-row{display:flex;align-items:center;gap:12px;margin-top:12px}
+    .avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(180deg,#fff2e6,#ffd7b8);display:flex;align-items:center;justify-content:center;font-size:30px}
+    .avatar-track{flex:1;height:10px;background:rgba(255,255,255,0.03);border-radius:999px;position:relative}
+    .avatar-track > .pos{position:absolute;left:0;top:-30px;transform:translateX(-50%);transition:left 0.8s cubic-bezier(.22,.9,.22,1)}
+
+    .missions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+    .mission{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;font-size:13px}
+
+    .badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .badge{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;font-weight:700}
+
+    .leaderboard{margin-top:14px}
+    table{width:100%;border-collapse:collapse;color:#cfe7ff}
+    td,th{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);text-align:left}
+
+    footer{margin-top:20px;color:var(--muted);font-size:13px}
+
+    /* confetti canvas full-screen */
+    #confetti{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:999}
+
+    /* small mobile tweaks */
+    @media (max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}button{padding:8px 10px}}
+  </style>
+</head>
+<body>
+  <canvas id="confetti"></canvas>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>5K Sahil Oyunlaştırma</h1>
+        <p class="lead">Başla düğmesine bas, telefonun GPS izin ver, koş ve puanları topla. (HTML/CSS/JS)</p>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="controls">
+        <button id="startBtn">Başla</button>
+        <button id="pauseBtn" class="ghost">Duraklat</button>
+        <button id="stopBtn" class="ghost">Bitir</button>
+        <button id="saveRun" class="ghost">Kaydet</button>
+        <button id="exportRuns" class="ghost">Run'ları Dışa Aktar</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><small>Mesafe</small><b id="dist">0.00 km</b></div>
+        <div class="stat"><small>Süre</small><b id="time">00:00</b></div>
+        <div class="stat"><small>Pace</small><b id="pace">0:00 /km</b></div>
+        <div class="stat"><small>Puan</small><b id="score">0</b></div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress" aria-hidden>
+          <i id="progressFill"></i>
+        </div>
+        <div class="checkpoints" id="checkpointsRow"></div>
+      </div>
+
+      <div class="avatar-row">
+        <div class="avatar">🏃</div>
+        <div class="avatar-track card">
+          <div class="pos" id="avatarPos">🏃</div>
+        </div>
+      </div>
+
+      <div class="missions" id="missions"></div>
+      <div class="badges" id="badges"></div>
+
+      <div class="leaderboard card" id="leaderboardWrap">
+        <h3 style="margin:8px 0">Leaderboard (Local)</h3>
+        <table id="leaderTable">
+          <thead><tr><th>#</th><th>İsim</th><th>Mesafe</th><th>Süre</th><th>Tarih</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+    </div>
+
+
+  </div>
+
+  <script>
+  // ---- Helper functions ----
+  function haversine(a,b){
+    const toRad = d => d*Math.PI/180;
+    const R = 6371000; // m
+    const dLat = toRad(b.lat-a.lat);
+    const dLon = toRad(b.lon-a.lon);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const sinDlat = Math.sin(dLat/2);
+    const sinDlon = Math.sin(dLon/2);
+    const aa = sinDlat*sinDlat + Math.cos(lat1)*Math.cos(lat2)*sinDlon*sinDlon;
+    const c = 2*Math.atan2(Math.sqrt(aa), Math.sqrt(1-aa));
+    return R*c; // meters
+  }
+
+  // ---- App state ----
+  const TARGET_M = 5000;
+  const checkpointMeters = Array.from({length:10},(_,i)=> (i+1)*500); // 500,1000,...,5000
+  let watchId = null;
+  let running = false;
+  let paused = false;
+  let lastPos = null;
+  let distance = 0; // meters
+  let startTime = null;
+  let elapsedMs = 0;
+  let score = 0;
+  let reachedCheckpoints = new Set();
+  let missions = [];
+
+  // DOM
+  const distEl = document.getElementById('dist');
+  const timeEl = document.getElementById('time');
+  const paceEl = document.getElementById('pace');
+  const scoreEl = document.getElementById('score');
+  const progressFill = document.getElementById('progressFill');
+  const avatarPos = document.getElementById('avatarPos');
+  const checkpointsRow = document.getElementById('checkpointsRow');
+  const missionsWrap = document.getElementById('missions');
+  const badgesWrap = document.getElementById('badges');
+  const leaderTableBody = document.querySelector('#leaderTable tbody');
+
+  // Init UI
+  function fmtTime(ms){
+    const s = Math.floor(ms/1000);
+    const mm = String(Math.floor(s/60)).padStart(2,'0');
+    const ss = String(s%60).padStart(2,'0');
+    return mm+':'+ss;
+  }
+  function fmtPace(ms,meters){
+    if(meters<1) return '0:00 /km';
+    const secPerKm = (ms / meters) * 1000;
+    const m = Math.floor(secPerKm/60);
+    const s = Math.round(secPerKm%60);
+    return `${m}:${String(s).padStart(2,'0')} /km`;
+  }
+
+  // populate checkpoints UI
+  function renderCheckpoints(){
+    checkpointsRow.innerHTML = checkpointMeters.map(m => `<span>${(m/1000).toFixed(1)} km</span>`).join('');
+  }
+  renderCheckpoints();
+
+  // missions generator
+  function genMissions(){
+    missions = [];
+    const targetPaceSec = Math.floor(Math.random()*120)+300; // random between 5:00 and 7:00
+    missions.push({id:'m1',text:`İlk 1 km'i ${Math.floor(targetPaceSec/60)}:${String(targetPaceSec%60).padStart(2,'0')} altında koş`,done:false});
+    missions.push({id:'m2',text:`Toplam 5K'yı bitir`,done:false});
+    missions.push({id:'m3',text:`3. km'de 20s sprint yap`,done:false});
+    renderMissions();
+  }
+  genMissions();
+
+  function renderMissions(){
+    missionsWrap.innerHTML = missions.map(m=>`<div class="mission" id="${m.id}">${m.done? '✅ ':'🟦 '}${m.text}</div>`).join('');
+  }
+
+  // checkpoint awarding
+  function checkForCheckpoints(){
+    checkpointMeters.forEach(cm=>{
+      if(distance >= cm && !reachedCheckpoints.has(cm)){
+        reachedCheckpoints.add(cm);
+        awardBadge(`${(cm/1000).toFixed(1)} km tamamlandı`);
+        score += Math.round(cm/100); // basit puan
+        updateScore();
+      }
+    });
+  }
+
+  function awardBadge(text){
+    const el = document.createElement('div');
+    el.className = 'badge';
+    el.textContent = '🏅 ' + text;
+    badgesWrap.prepend(el);
+    // small timeout remove after 15s
+    setTimeout(()=>{try{el.remove()}catch(e){}},15000);
+  }
+
+  function updateScore(){ scoreEl.textContent = score }
+
+  function updateUI(){
+    distEl.textContent = (distance/1000).toFixed(2) + ' km';
+    const now = Date.now();
+    const ms = (running && startTime) ? (elapsedMs + (now - startTime)) : elapsedMs;
+    timeEl.textContent = fmtTime(ms);
+    paceEl.textContent = fmtPace(ms, distance);
+    // progress
+    const percent = Math.min(100, (distance / TARGET_M) * 100);
+    progressFill.style.width = percent + '%';
+    // avatar position along track
+    avatarPos.style.left = percent + '%';
+    // missions check: simple checks
+    if(!missions[0].done && distance >= 1000){
+      // check if pace for first km meets sample target (approx): use captured first km time
+      missions[0].done = true; // for demo, mark done
+      document.getElementById(missions[0].id).textContent = '✅ ' + missions[0].text;
+      score += 20; updateScore();
+      awardBadge('İlk 1 km Görevi Tamam');
+    }
+    if(!missions[1].done && distance >= TARGET_M){
+      missions[1].done = true; document.getElementById(missions[1].id).textContent = '✅ ' + missions[1].text; score += 50; updateScore();
+      awardBadge('5K Tamamlandı');
+      runFinishCelebration();
+    }
+  }
+
+  // Geolocation handling
+  function startTracking(){
+    if(!navigator.geolocation) return alert('Tarayıcı konum API desteklemiyor.');
+    if(running) return;
+    running = true; paused=false; lastPos=null; distance=0; elapsedMs=0; score=0; reachedCheckpoints.clear(); badgesWrap.innerHTML='';
+    startTime = Date.now();
+    updateScore();
+    watchId = navigator.geolocation.watchPosition(pos=>{
+      const p = {lat:pos.coords.latitude, lon:pos.coords.longitude, ts:pos.timestamp};
+      if(lastPos){
+        const d = haversine(lastPos,p);
+        // ignore large jumps (GPS glitch)
+        if(d < 30) distance += d; else if(d < 200) distance += d; // allow up to 200m step
+      }
+      lastPos = p;
+      updateUI();
+      checkForCheckpoints();
+    },err=>{
+      console.error(err); alert('Konum alınırken hata: ' + err.message)
+    },{enableHighAccuracy:true,maximumAge:1000,timeout:10000});
+
+    // UI toggles
+    document.getElementById('startBtn').textContent='Koşu Devam Ediyor';
+  }
+
+  function pauseTracking(){
+    if(!running) return;
+    if(paused){ // resume
+      paused=false; startTime = Date.now(); document.getElementById('pauseBtn').textContent='Duraklat';
+    } else {
+      paused=true; // pause
+      elapsedMs += Date.now() - startTime; startTime = null; document.getElementById('pauseBtn').textContent='Devam Et';
+    }
+    if(watchId !== null){
+      if(paused) navigator.geolocation.clearWatch(watchId); else startTracking();
+    }
+  }
+
+  function stopTracking(){
+    if(watchId !== null) {try{navigator.geolocation.clearWatch(watchId)}catch(e){}
+      watchId = null}
+    if(running){
+      if(startTime) elapsedMs += Date.now() - startTime; startTime = null;
+      running = false; paused=false;
+      document.getElementById('startBtn').textContent='Başla';
+      updateUI();
+    }
+  }
+
+  // Save run locally (LocalStorage leaderboard)
+  function saveRun(){
+    const name = prompt('İsmini gir (leaderboard için):','Anonim');
+    if(!name) return;
+    const now = new Date();
+    const run = {name, distance: +(distance/1000).toFixed(3), durationMs:elapsedMs, date: now.toISOString()};
+    const runs = JSON.parse(localStorage.getItem('runs')||'[]');
+    runs.push(run);
+    localStorage.setItem('runs', JSON.stringify(runs));
+    renderLeaderboard();
+    alert('Run kaydedildi local olarak.');
+  }
+
+  function renderLeaderboard(){
+    const runs = JSON.parse(localStorage.getItem('runs')||'[]');
+    // sort by distance desc then duration asc
+    runs.sort((a,b)=> b.distance - a.distance || a.durationMs - b.durationMs);
+    leaderTableBody.innerHTML = runs.map((r,i)=>`<tr><td>${i+1}</td><td>${r.name}</td><td>${r.distance.toFixed(2)} km</td><td>${fmtTime(r.durationMs)}</td><td>${(new Date(r.date)).toLocaleString()}</td></tr>`).join('');
+  }
+  renderLeaderboard();
+
+  // export runs
+  function exportRuns(){
+    const runs = JSON.parse(localStorage.getItem('runs')||'[]');
+    const blob = new Blob([JSON.stringify(runs, null, 2)],{type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'runs.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
+
+  // confetti simple
+  const confettiCanvas = document.getElementById('confetti');
+  confettiCanvas.width = innerWidth; confettiCanvas.height = innerHeight;
+  const cctx = confettiCanvas.getContext('2d');
+  let confettiParticles = [];
+  function spawnConfetti(){
+    confettiParticles = Array.from({length:120},()=>({x: Math.random()*confettiCanvas.width, y: Math.random()*-confettiCanvas.height/2, vx:(Math.random()-0.5)*3, vy:2+Math.random()*4, r:2+Math.random()*4, rot:Math.random()*360, vr: Math.random()*6-3}));
+    requestAnimationFrame(confettiLoop);
+    setTimeout(()=>confettiParticles = [],3000);
+  }
+  function confettiLoop(){
+    cctx.clearRect(0,0,confettiCanvas.width,confettiCanvas.height);
+    if(confettiParticles.length===0) return;
+    confettiParticles.forEach(p=>{p.x+=p.vx; p.y+=p.vy; p.rot += p.vr; cctx.save(); cctx.translate(p.x,p.y); cctx.rotate(p.rot*Math.PI/180); cctx.fillRect(-p.r/2,-p.r/2,p.r,p.r); cctx.restore();});
+    requestAnimationFrame(confettiLoop);
+  }
+
+  function runFinishCelebration(){
+    spawnConfetti();
+  }
+
+  // handlers
+  document.getElementById('startBtn').addEventListener('click', ()=>{ if(!running) startTracking(); else alert('Koşu zaten başladı — durdurmak için "Bitir" e bas') });
+  document.getElementById('pauseBtn').addEventListener('click', pauseTracking);
+  document.getElementById('stopBtn').addEventListener('click', ()=>{ stopTracking(); });
+  document.getElementById('saveRun').addEventListener('click', saveRun);
+  document.getElementById('exportRuns').addEventListener('click', exportRuns);
+
+  // autosave/update loop for UI when running
+  setInterval(()=>{ if(running && !paused) updateUI(); },900);
+
+  // responsive confetti canvas
+  addEventListener('resize',()=>{ confettiCanvas.width = innerWidth; confettiCanvas.height = innerHeight });
+
+  </script>
+</body>
+</html>
